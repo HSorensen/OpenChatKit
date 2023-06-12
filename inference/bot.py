@@ -1,3 +1,6 @@
+import cProfile
+import pstats
+
 import os
 import sys
 
@@ -49,6 +52,7 @@ class ChatModel:
     bot_id = "<bot>"
 
     def __init__(self, model_name, gpu_id, max_memory):
+        print(f"$$ ChatModel init: model_name {model_name} gpu_id {gpu_id} max_memory {max_memory}")
         device = torch.device('cuda', gpu_id)   # TODO: allow sending to cpu
 
         # recommended default for devices with > 40 GB VRAM
@@ -82,6 +86,9 @@ class ChatModel:
                 torch_dtype=torch.float16
             )
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
+        print(f"ChatModel.__init__ self._model {self._model.__class__.__name__} ", dir(self._model))
+        print(f"generate {self._model.generate.__qualname__}")
+        # pp(inspect.getclasstree(inspect.getmro(self._model.__class__)))
 
     def do_inference(self, prompt, max_new_tokens, do_sample, temperature, top_k, stream_callback=None):
         stop_criteria = StopWordsCriteria(self._tokenizer, [self.human_id], stream_callback)
@@ -187,6 +194,27 @@ class OpenChatKitShell(cmd.Cmd):
             f"  top_k: {self._top_k}"
         )
 
+    def do_profile(self, arg):
+        'profile [dump|reset|show]'
+        if arg:
+            a=arg.split()
+
+            if a[0] == "dump":
+                print("do_profile: dump " + a[1] if len(a)>1 else "results.prof")
+                results=pstats.Stats(profile)
+                results.sort_stats(pstats.SortKey.TIME)
+                if len(a)>1:
+                    results.dump_stats(a[1])
+                else:
+                    results.dump_stats("results.prof")
+
+            if a[0] == "reset":
+                print("do_profile: reset")
+            if a[0] == "show":
+                print("do_profile: show")
+                results=pstats.Stats(profile)
+                results.print_stats()
+
     def do_quit(self, arg):
         return True
 
@@ -286,4 +314,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with cProfile.Profile() as profile:
+        main()
+        #results=pstats.Stats(profile)
+        #results.sort_stats(pstats.SortKey.TIME)
+        #results.print_stats()
+        #results.dump_stats("results.prof")
